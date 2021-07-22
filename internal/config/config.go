@@ -145,9 +145,5 @@ func init() {
 	// Configure logger
 	initLogging()
 	Configuration.DockerClient = initDocker()
-	fmt.Println(Configuration.Sftp.Url)
-	fmt.Println(Configuration.Sftp.Port)
-	fmt.Println(Configuration.Sftp.Username)
-	fmt.Println(Configuration.Sftp.Password)
 	initSftp()
 }
