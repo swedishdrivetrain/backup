@@ -2,11 +2,10 @@ package main
 
 //TODO: Complete log statements
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -36,8 +35,13 @@ func setup() {
 func cleanup() {
 	log.Infoln("cleanup")
 	log.Debug("cleaning up db dumps")
-	dir, _ := os.Open(config.Configuration.Paths.DatabaseDumps)
+	dir, err := os.Open(config.Configuration.Paths.DatabaseDumps)
+	if err != nil {
+		log.Errorf("error opening dir %v\n", err)
+	}
+
 	defer dir.Close()
+
 	files, _ := dir.Readdir(0)
 	for _, file := range files {
 		os.Remove(config.Configuration.Paths.DatabaseDumps + "/" + file.Name())
@@ -51,10 +55,14 @@ func consolidateDatabaseDumps() {
 	if err != nil {
 		log.Errorf("error opening dir %v\n", err)
 	}
+
+	defer dir.Close()
+
 	files, err := dir.Readdir(0)
 	if err != nil {
 		log.Errorf("error reading dir %v\n", err)
 	}
+
 	for _, file := range files {
 		if filepath.Ext(file.Name()) == ".sql" {
 			err := os.Rename(config.Configuration.Paths.DatabaseDumps+"/"+file.Name(), dbdump+file.Name())
@@ -63,7 +71,7 @@ func consolidateDatabaseDumps() {
 			}
 		}
 	}
-	dir.Close()
+
 }
 
 func databaseDump(ctx context.Context, database string) {
@@ -74,21 +82,26 @@ func databaseDump(ctx context.Context, database string) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	_, err = dc.ContainerExecAttach(ctx, respIdExecCreate.ID, types.ExecStartCheck{})
+	err = dc.ContainerExecStart(ctx, respIdExecCreate.ID, types.ExecStartCheck{})
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	execStatus, err := dc.ContainerExecInspect(ctx, respIdExecCreate.ID)
+	if err != nil {
+		log.Errorf(err.Error())
+	}
+	for execStatus.Running {
+		log.Info("Waiting for db dump to finish...")
+		time.Sleep(2 * time.Second)
+	}
 }
 
-func fileDump(srcPath string, destFile string) error {
-	// compress file or folder
-	var buf bytes.Buffer
-	if err := compress(srcPath, &buf); err != nil {
-		log.Errorf("Error compressing directory %v: %v\n", srcPath, err)
-		return err
-	}
-	if err := ioutil.WriteFile(destFile+".tar.gz", buf.Bytes(), 0660); err != nil {
-		log.Error("Unable to write compressed file: %v\n", err)
+func compressDir(srcPath string, destFile string) error {
+	cmd := exec.Command("tar", "-zcvf", destFile+".tar.gz", srcPath)
+	err := cmd.Run()
+	if err != nil {
+		log.Errorf("Unable to compress %v: %v", srcPath, err)
 		return err
 	}
 	return nil
@@ -105,13 +118,14 @@ func main() {
 		log.Infof("Dumping database %v\n", database)
 		databaseDump(ctx, database) //TODO: Use goroutines to dump databases in parallel and make the backup more efficent
 	}
+
 	// Gather dumps in workdir
 	consolidateDatabaseDumps()
 
 	// Compress all data directories
 	for _, path := range config.Configuration.Paths.FileDumps {
 		log.Infof("Compressing %v\n", path)
-		fileDump(path, fsdump+filepath.Base(path)) //TODO: Use goroutines to compress filesystems in parallel and make the backup more efficent
+		compressDir(path, fsdump+filepath.Base(path)) //TODO: Use goroutines to compress filesystems in parallel and make the backup more efficent
 	}
 
 	// Compress full backup
@@ -119,7 +133,7 @@ func main() {
 	date := time.Format(layoutISO)
 
 	log.Info("Compressing backup")
-	fileDump(workdir, "/tmp/backup-"+date)
+	compressDir(workdir, "/tmp/backup-"+date)
 
 	defer conn.Close()
 
