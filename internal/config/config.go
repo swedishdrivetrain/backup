@@ -59,19 +59,19 @@ func initViper() error {
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Fatalf("Config file not found: %v", err)
+			log.Fatalf("config file not found: %v", err)
 		} else {
-			log.Fatalf(" Unknown error occured while reading config. error: %v", err)
+			log.Fatalf("unknown error occured while reading config. error: %v", err)
 		}
 	}
 	err := viper.Unmarshal(&Configuration)
 	if err != nil {
-		log.Fatalf("Error unmarshaling config: %v", err)
+		log.Fatalf("error unmarshaling config: %v", err)
 	}
 
 	viper.WatchConfig()
 
-	log.Infof("Using config file found at %v", viper.GetViper().ConfigFileUsed())
+	log.Infof("using config file found at %v", viper.GetViper().ConfigFileUsed())
 
 	return err
 }
@@ -84,7 +84,7 @@ func initLogging() {
 
 	if Configuration.Global.Debug {
 		log.SetLevel(log.DebugLevel)
-		log.Debugln("Enabled DEBUG logging level")
+		log.Debugln("enabled DEBUG logging level")
 	}
 }
 
@@ -99,7 +99,7 @@ func initDocker() *client.Client {
 
 func initSftp() {
 	var err error
-	fmt.Fprintf(os.Stdout, "Connecting to %v ...\n", Configuration.Sftp.Url)
+	log.Infof("connecting to %v ...", Configuration.Sftp.Url)
 
 	var auths []ssh.AuthMethod
 
@@ -124,12 +124,12 @@ func initSftp() {
 	}
 
 	addr := fmt.Sprintf("%s:%d", Configuration.Sftp.Url, Configuration.Sftp.Port)
-	fmt.Println(addr)
+	log.Debugf("sftp address: %v", addr)
 
 	// Connect to server
 	Configuration.SSHClient, err = ssh.Dial("tcp", addr, &config)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect to [%s]: %v\n", addr, err)
+		log.Errorf("failed to connect to [%s]: %v", addr, err)
 		os.Exit(1)
 	}
 }
@@ -139,7 +139,7 @@ func init() {
 	// Build config
 	err := initViper()
 	if err != nil {
-		log.Fatal("Unable to init config. Bye.")
+		log.Fatal("unable to init config. Bye.")
 	}
 
 	// Configure logger

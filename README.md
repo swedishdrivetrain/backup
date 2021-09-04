@@ -3,6 +3,13 @@
 
 Golang script to backup data and databases on the Joomla server
 
+## Build & Release
+Build and release is automated via Github actions. Status is displayed in the above badge. 
+The latest stable version of the script can be found in the releases section of this repo.
+
+When contributing make sure you push a tag on the commit you want to release or else the build fails.
+
+---
 ## Config
 The script requires a config located on one of the following locations. paths starting with `./` means relative to the location of the script, `/` means from the root of the filesystem
 * `./`
@@ -51,6 +58,3 @@ sftp:
   password: example_password
 ```
 All options in the file are **MANDATORY**
-
-## Scheduling
-The latest stable version of the script can be found in the releases section of this repo.

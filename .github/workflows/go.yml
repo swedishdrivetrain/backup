@@ -3,12 +3,17 @@ name: Go
 on:
   push:
     branches: [ master ]
+    tags:
+    - '*'
   pull_request:
     branches: [ master ]
 
 jobs:
-
   build:
+    strategy:
+      matrix:
+        go-arch: [amd64, arm64]
+        go-os: [linux, darwin]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -19,4 +24,10 @@ jobs:
         go-version: 1.16
 
     - name: Build
-      run: go build -v ./...
+      run: env GOOS=${{ matrix.go-os }} GOARCH=${{ matrix.go-arch }} go build -o ./build/jbackup-${{ matrix.go-os }}-${{ matrix.go-arch }} .
+
+    - name: publish release
+      uses: ncipollo/release-action@v1
+          with:
+            artifacts: "build/*"
+            token: ${{ secrets.GITHUB_TOKEN }}
