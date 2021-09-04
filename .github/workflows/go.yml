@@ -2,7 +2,6 @@ name: Go
 
 on:
   push:
-    branches: [ master ]
     tags:
     - '*'
   pull_request:
@@ -10,6 +9,7 @@ on:
 
 jobs:
   build:
+    name: build
     strategy:
       matrix:
         go-arch: [amd64, arm64]
@@ -25,7 +25,11 @@ jobs:
 
     - name: Build
       run: env GOOS=${{ matrix.go-os }} GOARCH=${{ matrix.go-arch }} go build -o ./build/jbackup-${{ matrix.go-os }}-${{ matrix.go-arch }} .
-
+  release:
+    name: release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
     - name: publish release
       uses: ncipollo/release-action@v1
       with:
