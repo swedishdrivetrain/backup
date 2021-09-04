@@ -25,11 +25,23 @@ jobs:
 
     - name: Build
       run: env GOOS=${{ matrix.go-os }} GOARCH=${{ matrix.go-arch }} go build -o ./build/jbackup-${{ matrix.go-os }}-${{ matrix.go-arch }} .
+  
+    - name: store build output
+      uses: actions/upload-artifact@v2
+      with:
+        name: build artifacts
+        path: build
+
   release:
     name: release
     needs: build
     runs-on: ubuntu-latest
     steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v2
+      with:
+        path: build
+
     - name: publish release
       uses: ncipollo/release-action@v1
       with:
