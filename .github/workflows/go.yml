@@ -28,6 +28,6 @@ jobs:
 
     - name: publish release
       uses: ncipollo/release-action@v1
-          with:
-            artifacts: "build/*"
-            token: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        artifacts: "build/*"
+        token: ${{ secrets.GITHUB_TOKEN }}
