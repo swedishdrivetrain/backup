@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -20,9 +21,18 @@ var (
 	dbdump    = workdir + "db/"
 	fsdump    = workdir + "fs/"
 	dc        = config.Configuration.DockerClient
+	timestamp string
+	ctx       context.Context
+	conn      *ssh.Client
 )
 
 func setup() {
+	// set timestamp of backup
+	time := time.Now()
+	timestamp = time.Format(layoutISO)
+	ctx = context.Background()
+	conn = config.Configuration.SSHClient
+
 	log.Debugf("creating workdir %v", workdir)
 	os.Mkdir(workdir, 0755)
 	log.Debugf("creating database dump folder %v", dbdump)
@@ -33,6 +43,22 @@ func setup() {
 
 func cleanup() {
 	log.Infof("cleanup")
+
+	go removeBackupFile()
+	go cleanDumps()
+	go cleanWorkdir()
+}
+
+func removeBackupFile() {
+	log.Info("cleaning backup file")
+
+	err := os.Remove("/tmp/backup-" + timestamp + ".tar.gz")
+	if err != nil {
+		log.Errorf("error removing backup file %v", err)
+	}
+}
+
+func cleanDumps() {
 	log.Debug("cleaning up db dumps")
 	dir, err := os.Open(config.Configuration.Paths.DatabaseDumps)
 	if err != nil {
@@ -43,10 +69,30 @@ func cleanup() {
 
 	files, _ := dir.Readdir(0)
 	for _, file := range files {
-		os.Remove(config.Configuration.Paths.DatabaseDumps + "/" + file.Name())
+		err = os.Remove(config.Configuration.Paths.DatabaseDumps + "/" + file.Name())
+		if err != nil {
+			log.Errorf("error removing file %v", err)
+		}
 	}
+}
+
+func cleanWorkdir() {
 	log.Debug("remove workdir")
-	os.RemoveAll(workdir)
+	dir, err := os.Open(workdir)
+	if err != nil {
+		log.Errorf("error opening dir %v", err)
+	}
+
+	defer dir.Close()
+
+	files, _ := dir.Readdir(0)
+	for _, file := range files {
+		os.Remove(config.Configuration.Paths.DatabaseDumps + "/" + file.Name())
+		if err != nil {
+			log.Errorf("Error removing dump %v", err)
+		}
+	}
+
 }
 
 func consolidateDatabaseDumps() {
@@ -109,8 +155,6 @@ func compressDir(srcPath string, destFile string) error {
 func main() {
 	setup()
 	defer cleanup()
-	ctx := context.Background()
-	conn := config.Configuration.SSHClient
 
 	// Dump all databases
 	for _, database := range config.Configuration.Database.Databases {
@@ -128,25 +172,21 @@ func main() {
 	}
 
 	// Compress full backup
-	time := time.Now()
-	date := time.Format(layoutISO)
-
 	log.Info("compressing backup")
-	compressDir(workdir, "/tmp/backup-"+date)
 
+	compressDir(workdir, "/tmp/backup-"+timestamp)
 	defer conn.Close()
 
 	// Create new SFTP client
 	sc, err := sftp.NewClient(conn)
 	if err != nil {
-		log.Fatalf("unable to start SFTP subsystem: %v", err)
+		log.Errorf("unable to start SFTP subsystem: %v", err)
 	}
 	defer sc.Close()
 
 	// Upload to SFTP site
 	log.Info("uploading backup to store")
-	uploadBackup(sc, "/tmp/backup-"+date+".tar.gz", "backup-"+date+".tar.gz")
-	// Cleanup
-	os.Remove("/tmp/backup-" + date + ".tar.gz")
+	uploadBackup(sc, "/tmp/backup-"+timestamp+".tar.gz", "backup-"+timestamp+".tar.gz")
+
 	log.Info("done. exiting.")
 }
