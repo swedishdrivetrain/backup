@@ -10,7 +10,6 @@ import (
 
 	"github.com/AnimeNL/joomla-backup/internal/config"
 	"github.com/docker/docker/api/types"
-	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
@@ -39,60 +38,6 @@ func setup() {
 	os.Mkdir(dbdump, 0755)
 	log.Debugf("creating filesystem dump folder %v", fsdump)
 	os.Mkdir(fsdump, 0755)
-}
-
-func cleanup() {
-	log.Infof("cleanup")
-
-	go removeBackupFile()
-	go cleanDumps()
-	go cleanWorkdir()
-}
-
-func removeBackupFile() {
-	log.Info("cleaning backup file")
-
-	err := os.Remove("/tmp/backup-" + timestamp + ".tar.gz")
-	if err != nil {
-		log.Errorf("error removing backup file %v", err)
-	}
-}
-
-func cleanDumps() {
-	log.Debug("cleaning up db dumps")
-	dir, err := os.Open(config.Configuration.Paths.DatabaseDumps)
-	if err != nil {
-		log.Errorf("error opening dir %v", err)
-	}
-
-	defer dir.Close()
-
-	files, _ := dir.Readdir(0)
-	for _, file := range files {
-		err = os.Remove(config.Configuration.Paths.DatabaseDumps + "/" + file.Name())
-		if err != nil {
-			log.Errorf("error removing file %v", err)
-		}
-	}
-}
-
-func cleanWorkdir() {
-	log.Debug("remove workdir")
-	dir, err := os.Open(workdir)
-	if err != nil {
-		log.Errorf("error opening dir %v", err)
-	}
-
-	defer dir.Close()
-
-	files, _ := dir.Readdir(0)
-	for _, file := range files {
-		os.Remove(config.Configuration.Paths.DatabaseDumps + "/" + file.Name())
-		if err != nil {
-			log.Errorf("Error removing dump %v", err)
-		}
-	}
-
 }
 
 func consolidateDatabaseDumps() {
@@ -175,18 +120,10 @@ func main() {
 	log.Info("compressing backup")
 
 	compressDir(workdir, "/tmp/backup-"+timestamp)
-	defer conn.Close()
-
-	// Create new SFTP client
-	sc, err := sftp.NewClient(conn)
-	if err != nil {
-		log.Errorf("unable to start SFTP subsystem: %v", err)
-	}
-	defer sc.Close()
 
 	// Upload to SFTP site
 	log.Info("uploading backup to store")
-	uploadBackup(sc, "/tmp/backup-"+timestamp+".tar.gz", "backup-"+timestamp+".tar.gz")
+	uploadBackup("/tmp/backup-"+timestamp+".tar.gz", "backup-"+timestamp+".tar.gz")
 
 	log.Info("done. exiting.")
 }

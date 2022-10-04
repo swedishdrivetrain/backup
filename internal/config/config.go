@@ -26,7 +26,8 @@ type Config struct {
 }
 
 type GlobalConfig struct {
-	Debug bool
+	Debug  bool
+	Dryrun bool
 }
 
 type PathConfig struct {

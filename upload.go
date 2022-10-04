@@ -6,12 +6,29 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AnimeNL/joomla-backup/internal/config"
 	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
 )
 
 // Upload file to sftp server
-func uploadBackup(sc *sftp.Client, localFile, remoteFile string) (err error) {
+func uploadBackup(localFile, remoteFile string) (err error) {
+
+	// Upload is not done if it's a dryrun (testing)
+	if config.Configuration.Global.Dryrun {
+		log.Warn("Dryrun. Will not upload.")
+		return
+	}
+
+	defer conn.Close()
+	// Create new SFTP client
+	sc, err := sftp.NewClient(conn)
+	if err != nil {
+		log.Errorf("unable to start SFTP subsystem: %v", err)
+	}
+	defer sc.Close()
+
+	// Upload file to SFTP
 	log.Infof("uploading [%s] to [%s] ...", localFile, remoteFile)
 
 	srcFile, err := os.Open(localFile)

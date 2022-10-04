@@ -22,6 +22,7 @@ The config needs to have the `.yml` or `.yaml` extension and has the following s
 # debug is of type BOOL
 global: 
   debug: true
+  dryrun: true
 
 # database config contains credentials and a list of databases.
 # credentials is of type STRING.
