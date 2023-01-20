@@ -1,14 +1,8 @@
 package config
 
 import (
-	"fmt"
-	"net"
-	"os"
-
 	"github.com/docker/docker/client"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 
 	"github.com/spf13/viper"
 )
@@ -21,7 +15,6 @@ type Config struct {
 	DataDirs     []string
 	Paths        PathConfig
 	DockerClient *client.Client
-	SSHClient    *ssh.Client
 	Sftp         SftpConfig
 }
 
@@ -98,43 +91,6 @@ func initDocker() *client.Client {
 	return cli
 }
 
-func initSftp() {
-	var err error
-	log.Infof("connecting to %v ...", Configuration.Sftp.Url)
-
-	var auths []ssh.AuthMethod
-
-	// Try to use $SSH_AUTH_SOCK which contains the path of the unix file socket that the sshd agent uses
-	// for communication with other processes.
-	if aconn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-		auths = append(auths, ssh.PublicKeysCallback(agent.NewClient(aconn).Signers))
-	}
-
-	// Use password authentication if provided
-	if Configuration.Sftp.Password != "" {
-		auths = append(auths, ssh.Password(Configuration.Sftp.Password))
-	}
-
-	// Initialize client configuration
-	config := ssh.ClientConfig{
-		User: Configuration.Sftp.Username,
-		Auth: auths,
-		// Uncomment to ignore host key check
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		// HostKeyCallback: ssh.FixedHostKey(hostKey),
-	}
-
-	addr := fmt.Sprintf("%s:%d", Configuration.Sftp.Url, Configuration.Sftp.Port)
-	log.Debugf("sftp address: %v", addr)
-
-	// Connect to server
-	Configuration.SSHClient, err = ssh.Dial("tcp", addr, &config)
-	if err != nil {
-		log.Errorf("failed to connect to [%s]: %v", addr, err)
-		os.Exit(1)
-	}
-}
-
 func init() {
 
 	// Build config
@@ -143,8 +99,12 @@ func init() {
 		log.Fatal("unable to init config. Bye.")
 	}
 
+	// Check if an ssh password is provided for sftp
+	if Configuration.Sftp.Password == "" {
+		log.Fatal("No password provided for SFTP. Cannot run.")
+	}
+
 	// Configure logger
 	initLogging()
 	Configuration.DockerClient = initDocker()
-	initSftp()
 }

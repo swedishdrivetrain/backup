@@ -11,7 +11,6 @@ import (
 	"github.com/AnimeNL/joomla-backup/internal/config"
 	"github.com/docker/docker/api/types"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -22,7 +21,6 @@ var (
 	dc        = config.Configuration.DockerClient
 	timestamp string
 	ctx       context.Context
-	conn      *ssh.Client
 )
 
 func setup() {
@@ -30,7 +28,6 @@ func setup() {
 	time := time.Now()
 	timestamp = time.Format(layoutISO)
 	ctx = context.Background()
-	conn = config.Configuration.SSHClient
 
 	log.Debugf("creating workdir %v", workdir)
 	os.Mkdir(workdir, 0755)
