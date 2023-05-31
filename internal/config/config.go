@@ -19,8 +19,10 @@ type Config struct {
 }
 
 type GlobalConfig struct {
-	Debug  bool
-	Dryrun bool
+	Debug    bool
+	Dryrun   bool
+	Timezone string
+	MaxAge   int
 }
 
 type PathConfig struct {

@@ -19,11 +19,13 @@ The script requires a config located on one of the following locations. paths st
 The config needs to have the `.yml` or `.yaml` extension and has the following structure and options: 
 ```yaml
 # Global config items: 
-# debug is of type BOOL
+# debug and dryrun are of type BOOL
 global: 
   debug: true
   dryrun: true
-
+  timezone: Europe/Amsterdam
+  maxage: 12 # max backup age in months
+  
 # database config contains credentials and a list of databases.
 # credentials is of type STRING.
 # databases if of type STRING in LIST format.

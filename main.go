@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/AnimeNL/joomla-backup/internal/config"
+	"joomla-backup/internal/config"
+	"joomla-backup/internal/sftp"
+
 	"github.com/docker/docker/api/types"
 	log "github.com/sirupsen/logrus"
 )
@@ -20,12 +22,19 @@ var (
 	fsdump    = workdir + "fs/"
 	dc        = config.Configuration.DockerClient
 	timestamp string
+	timezone  *time.Location
 	ctx       context.Context
 )
 
 func setup() {
+	var err error
 	// set timestamp of backup
-	time := time.Now()
+	timezone, err = time.LoadLocation(config.Configuration.Global.Timezone)
+	if err != nil {
+		log.Fatalf("Error loading timezone. Is the format correct?")
+	}
+
+	time := time.Now().In(timezone)
 	timestamp = time.Format(layoutISO)
 	ctx = context.Background()
 
@@ -94,8 +103,32 @@ func compressDir(srcPath string, destFile string) error {
 	return nil
 }
 
+func cleanupOldBackups() error {
+
+	files, err := sftp.ListBackups()
+	if err != nil {
+		log.Fatalf("error in listing backups: %v", err)
+	}
+
+	for i := range files {
+		if files[i].ModTime().Before(time.Now().In(timezone).AddDate(0, -config.Configuration.Global.MaxAge, 0)) {
+
+			switch config.Configuration.Global.Dryrun {
+			case false:
+				sftp.DeleteBackup(files[i].Name())
+			default:
+				log.Infof("simulating delete of file %s", files[i].Name())
+			}
+
+		}
+	}
+
+	return nil
+}
+
 func main() {
 	setup()
+	defer cleanupOldBackups()
 	defer cleanup()
 
 	// Dump all databases
@@ -120,7 +153,7 @@ func main() {
 
 	// Upload to SFTP site
 	log.Info("uploading backup to store")
-	uploadBackup("/tmp/backup-"+timestamp+".tar.gz", "backup-"+timestamp+".tar.gz")
+	sftp.UploadBackup("/tmp/backup-"+timestamp+".tar.gz", "backup-"+timestamp+".tar.gz")
 
 	log.Info("done. exiting.")
 }

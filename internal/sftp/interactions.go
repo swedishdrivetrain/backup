@@ -1,61 +1,42 @@
-package main
+package sftp
 
 import (
-	"fmt"
 	"io"
-	"net"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
-	c "github.com/AnimeNL/joomla-backup/internal/config"
+	c "joomla-backup/internal/config"
+
 	"github.com/pkg/sftp"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 )
 
-func initSftp() (*ssh.Client, error) {
-	var err error
-	log.Infof("connecting to %v ...", c.Configuration.Sftp.Url)
-
-	var auths []ssh.AuthMethod
-
-	// Try to use $SSH_AUTH_SOCK which contains the path of the unix file socket that the sshd agent uses
-	// for communication with other processes.
-	if aconn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-		auths = append(auths, ssh.PublicKeysCallback(agent.NewClient(aconn).Signers))
-	}
-
-	// Use password authentication if provided
-	if c.Configuration.Sftp.Password != "" {
-		auths = append(auths, ssh.Password(c.Configuration.Sftp.Password))
-	}
-
-	// Initialize client configuration
-	config := ssh.ClientConfig{
-		User: c.Configuration.Sftp.Username,
-		Auth: auths,
-		// Uncomment to ignore host key check
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		// HostKeyCallback: ssh.FixedHostKey(hostKey),
-	}
-
-	addr := fmt.Sprintf("%s:%d", c.Configuration.Sftp.Url, c.Configuration.Sftp.Port)
-	log.Debugf("sftp address: %v", addr)
-
-	// Connect to server
-	SSHClient, err := ssh.Dial("tcp", addr, &config)
+func ListBackups() ([]fs.FileInfo, error) {
+	conn, err := initSftp()
 	if err != nil {
-		log.Errorf("failed to connect to [%s]: %v", addr, err)
-		return nil, err
+		log.Fatalf("Error opening SSH connection: %v", err.Error())
+	}
+	defer conn.Close()
+
+	// Create new SFTP client
+	sc, err := sftp.NewClient(conn)
+	if err != nil {
+		log.Errorf("unable to start SFTP subsystem: %v", err)
+	}
+	defer sc.Close()
+
+	files, err := sc.ReadDir("/")
+	if err != nil {
+		log.Errorf("unable to list files in SFTP remote: %v", err)
 	}
 
-	return SSHClient, nil
+	return files, nil
 }
 
 // Upload file to sftp server
-func uploadBackup(localFile, remoteFile string) (err error) {
+func UploadBackup(localFile, remoteFile string) (err error) {
 	conn, err := initSftp()
 	if err != nil {
 		log.Fatalf("Error opening SSH connection: %v", err.Error())
@@ -66,8 +47,8 @@ func uploadBackup(localFile, remoteFile string) (err error) {
 		log.Warn("Dryrun. Will not upload.")
 		return
 	}
-
 	defer conn.Close()
+
 	// Create new SFTP client
 	sc, err := sftp.NewClient(conn)
 	if err != nil {
@@ -109,4 +90,26 @@ func uploadBackup(localFile, remoteFile string) (err error) {
 	log.Infof("%d bytes copied", bytes)
 
 	return
+}
+
+func DeleteBackup(remoteFile string) (err error) {
+	conn, err := initSftp()
+	if err != nil {
+		log.Fatalf("Error opening SSH connection: %v", err.Error())
+	}
+	defer conn.Close()
+
+	// Create new SFTP client
+	sc, err := sftp.NewClient(conn)
+	if err != nil {
+		log.Errorf("unable to start SFTP subsystem: %v", err)
+	}
+	defer sc.Close()
+
+	err = sc.Remove(remoteFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
