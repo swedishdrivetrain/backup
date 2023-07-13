@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	workdir   = "/tmp/jbackup/"
+	workdir   = "/tmp/backup/"
 	layoutISO = "2006-01-02T15:04:05"
 	dbdump    = workdir + "db/"
 	fsdump    = workdir + "fs/"

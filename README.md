@@ -1,7 +1,7 @@
-# Joomla-backup 
-[![Go](https://github.com/AnimeNL/joomla-backup/actions/workflows/go.yml/badge.svg)](https://github.com/AnimeNL/joomla-backup/actions/workflows/go.yml)
+# backup 
+[![Go](https://github.com/swedishdrivetrain/backup/actions/workflows/go.yml/badge.svg)](https://github.com/swedishdrivetrain/backup/actions/workflows/go.yml)
 
-Golang script to backup data and databases on the Joomla server
+Golang script to backup data and databases
 
 ## Build & Release
 Build and release is automated via Github actions. Status is displayed in the above badge. 
@@ -14,7 +14,7 @@ When contributing make sure you push a tag on the commit you want to release or 
 The script requires a config located on one of the following locations. paths starting with `./` means relative to the location of the script, `/` means from the root of the filesystem
 * `./`
 * `./config`
-* `/etc/jbackup`
+* `/etc/backup`
 
 The config needs to have the `.yml` or `.yaml` extension and has the following structure and options: 
 ```yaml
